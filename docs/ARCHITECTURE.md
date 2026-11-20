@@ -20,6 +20,18 @@ Job
     └─ storage.UploadDirectory (Optional S3 / MinIO direct sync)
 ```
 
+Post-packaging verification runs independently and never re-encodes:
+
+```text
+Existing output directory
+ └─ audit.Audit / mosaic.AuditPackage
+    ├─ Detect format (master.m3u8 or manifest.mpd)
+    ├─ Resolve every manifest reference inside the output root
+    ├─ Verify init segments, media segments and subtitle payloads on disk
+    ├─ Check numbering, timeline gaps/overlaps and duration continuity
+    └─ Emit a deterministically ordered Report (text or JSON)
+```
+
 ---
 
 ## Domain Packages & Responsibilities
@@ -52,27 +64,31 @@ Job
 - **Files**: `preview/server.go`.
 - **Role**: Embedded local HTTP server featuring a modern dark-mode HTML5 player (Hls.js / Dash.js), audio track selector, quality switcher, and live stream telemetry.
 
-### 8. `subtitles`
+### 8. `audit`
+- **Files**: `audit/audit.go`, `audit/hls.go`, `audit/dash.go`, `audit/dash_parse.go`, `audit/fs.go`, `audit/util.go`, `audit/report.go`.
+- **Role**: Read-only post-packaging verification of existing HLS/DASH output directories without re-encoding. Cross-checks manifest and playlist references, initialization segments, media segments, subtitle payloads, segment numbering, timeline gaps/overlaps, duration continuity, and track declarations, returning a deterministically ordered report. Enforces explicit safety limits (manifest size, rendition count, segments per rendition, issue cap) and rejects path-escaping references. Reachable from the `mosaic audit` CLI subcommand and the root-package `mosaic.AuditPackage` API.
+
+### 9. `subtitles`
 - **Files**: `subtitles/subtitles.go`.
 - **Role**: Auto-converts SRT subtitles to WebVTT format and injects `#EXT-X-MEDIA:TYPE=SUBTITLES` into HLS master playlists and `<AdaptationSet contentType="text">` into DASH manifests.
 
-### 9. `watermark`
+### 10. `watermark`
 - **Files**: `watermark/watermark.go`.
 - **Role**: Constructs responsive FFmpeg overlay coordinates and opacity mixers for dynamic logo watermarking across different rendition resolutions.
 
-### 10. `encryption`
+### 11. `encryption`
 - **Files**: `encryption/encryption.go`.
 - **Role**: Generates cryptographically secure 16-byte AES keys and creates standard `enc.keyinfo` files for HLS AES-128 segment protection.
 
-### 11. `storage`
+### 12. `storage`
 - **Files**: `storage/storage.go`.
 - **Role**: Pure Go (Zero-Dependency) AWS Signature Version 4 client for concurrent direct streaming asset uploads to S3, MinIO, or Cloudflare R2 with optimal MIME and cache headers.
 
-### 12. `internal/executor`
+### 13. `internal/executor`
 - **Files**: `internal/executor/executor.go`, `internal/executor/mock.go`.
 - **Role**: Command execution abstraction capturing process execution time, peak memory usage (RSS), and providing a fast Mock Executor for 100% unit test coverage.
 
-### 13. `config`
+### 14. `config`
 - **Files**: `config/profiles.go`.
 - **Role**: Defines `Profile` presets (`VOD`, `LIVE`), `VideoCodec` enums (`CodecH264`, `CodecHEVC`, `CodecAV1`), and GPU backend constants (`GPU_NVENC`, `GPU_VAAPI`, `GPU_VIDEOTOOLBOX`).
 

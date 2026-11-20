@@ -183,6 +183,26 @@ chunk-stream*.m4s
 
 Use an HTTP server for playback tests.
 
+## Playback Goes Black Mid-Stream or a Segment Is Missing
+
+Run the read-only packaging auditor against the output directory. It never re-encodes and pinpoints the exact file, rendition, and timeline position of the defect:
+
+```bash
+mosaic audit ./output/hls
+mosaic audit --json ./output/dash
+```
+
+Common findings and their meaning:
+
+- `missing_file`: a playlist/manifest references a segment, init segment, or subtitle payload that does not exist (the typical "black screen halfway through" cause).
+- `timeline_gap` / `timeline_overlap`: segment numbering or the DASH SegmentTimeline is non-contiguous.
+- `path_escape`: a reference points outside the output directory (for example `../../etc/x.m4s`) or uses an unsupported absolute form, so packaged uploads break.
+- `duplicate_segment`: the same segment is referenced twice.
+- `invalid_duration`: an EXTINF is zero/negative or exceeds the target duration.
+- `manifest_too_large`, `rendition_limit_exceeded`, `segment_limit_exceeded`: a configured safety limit was exceeded; override with the `--max-*` flags if the package is legitimate.
+
+The CLI exits `0` when no error-severity issues are found, `1` when defects are present, and `2` on setup failure (missing/empty directory or no manifest).
+
 ## Tests Fail Because Go Cache Is Read-Only
 
 Symptom:

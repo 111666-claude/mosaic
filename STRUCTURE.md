@@ -19,7 +19,7 @@ mosaic/
 ├── job.go                        # Public Job/Profile/Progress types
 ├── orientation.go                # Orientation normalization helpers
 ├── cmd/mosaic/
-│   └── main.go                   # CLI entrypoint (encoding + preview subcommand)
+│   └── main.go                   # CLI entrypoint (encoding, preview and audit subcommands)
 ├── config/
 │   ├── profiles.go               # Profiles, VideoCodec, and GPU constants
 │   └── profiles_test.go
@@ -57,6 +57,14 @@ mosaic/
 ├── preview/
 │   ├── server.go                 # Local dark-mode web player (HLS.js / Dash.js)
 │   └── server_test.go
+├── audit/
+│   ├── audit.go                  # Audit entry point, Options, Issue and Report types
+│   ├── hls.go                    # HLS master/media playlist verification
+│   ├── dash.go                   # DASH MPD, SegmentTemplate and timeline verification
+│   ├── dash_parse.go             # Dependency-free MPD tokenizer
+│   ├── fs.go                     # Safe reference resolution and disk-file checks
+│   ├── util.go                   # Segment numbering and ISO 8601 duration helpers
+│   └── report.go                 # Deterministic text/JSON report renderers
 ├── subtitles/
 │   ├── subtitles.go              # SRT-to-VTT converter and HLS/DASH manifest injector
 │   └── subtitles_test.go
@@ -108,6 +116,7 @@ Job
 - `encoder`: FFmpeg command assembly for HLS/DASH CMAF, Codecs, and Encryption.
 - `thumbnail`: Automatic storyboard sprite sheet and WebVTT cues generation.
 - `preview`: Local devtools HTTP preview server with web player.
+- `audit`: Read-only HLS/DASH package verification (manifest references, init segments, media segments, timeline continuity, track declarations) without re-encoding.
 - `subtitles`: SRT-to-VTT subtitle converter and manifest injector.
 - `watermark`: Responsive logo/watermark overlay filter graph generation.
 - `encryption`: HLS AES-128 key generation and keyinfo configuration.

@@ -37,6 +37,7 @@ Designed for server-side video infrastructure, background workers, and media pip
 - **Smart Quality & Capped-CRF**: Content-Aware Bitrate optimization combining Constant Rate Factor (CRF) with VBV maxrate caps to save 30–50% bandwidth without quality loss.
 - **Storyboard Thumbnails (Trick-Play Preview)**: Automatically generates sprite sheets (`thumbnails_0.jpg`) and standard WebVTT cue files (`thumbnails.vtt`) for timeline scrubber previews in modern video players.
 - **Built-in Web Preview DevTools Player**: Instantly test and inspect streams locally via `mosaic preview [dir]` featuring a dark-mode web player (Hls.js / Dash.js), audio/rendition switcher, and live diagnostics.
+- **Packaging Audit (Read-Only)**: Verify any existing HLS/DASH output directory with `mosaic audit [dir]` or the `mosaic.AuditPackage` API — detects missing segments, path-escaping references, duplicate segments, timeline gaps/overlaps, broken subtitle references, and oversized manifests without re-encoding.
 - **Subtitles & Multi-Track Audio**: Converts SRT to WebVTT automatically and injects subtitle tracks into HLS master playlists (`#EXT-X-MEDIA:TYPE=SUBTITLES`) and DASH AdaptationSets.
 - **EBU R128 Audio Normalization**: Automatic broadcast-standard audio normalization (`loudnorm=I=-16:TP=-1.5:LRA=11`) ensuring uniform volume levels.
 - **Dynamic Watermarking & Branding**: Configurable overlay placement (`top-right`, `top-left`, `bottom-right`, `bottom-left`, `center`), alpha opacity blending, and auto-scaling relative to rendition widths.
@@ -101,6 +102,10 @@ mosaic -i input.mp4 -o ./output/hls_s3 \
 
 # 5. Launch local web player to preview generated streams:
 mosaic preview ./output/hls
+
+# 6. Audit an existing package without re-encoding (exit 0 = no errors, 1 = defects, 2 = setup failure):
+mosaic audit ./output/hls
+mosaic audit --json ./output/dash
 ```
 
 ---
@@ -229,6 +234,50 @@ func main() {
 	}
 }
 ```
+
+---
+
+## 🔍 Auditing an Existing Package
+
+Audits are read-only: they parse manifests and cross-check references against the files on disk, never invoking FFmpeg or modifying the package.
+
+### CLI
+
+```bash
+# Text report; exit code 0 when no errors are found, 1 on defects, 2 on setup failure
+mosaic audit ./output/hls
+
+# Machine-readable JSON, with explicit safety limits
+mosaic audit --json --max-renditions 16 --max-segments 5000 ./output/dash
+```
+
+### Go Library
+
+```go
+package main
+
+import (
+	"fmt"
+	"log"
+
+	"github.com/farshidrezaei/mosaic"
+)
+
+func main() {
+	report, err := mosaic.AuditPackage("./output/hls")
+	if err != nil {
+		// Setup failure: missing/empty directory or no recognizable manifest.
+		log.Fatalf("audit could not run: %v", err)
+	}
+
+	fmt.Print(report.FormatText())
+	if report.HasErrors() {
+		log.Fatalf("package has %d error-severity issue(s)", report.ErrorCount)
+	}
+}
+```
+
+The report covers, per rendition: playlist/manifest references, initialization segments, media segments, segment numbering and timeline continuity, declared durations, and subtitle track declarations. All issues are stably sorted and carry a machine-readable code (e.g. `missing_file`, `path_escape`, `duplicate_segment`, `timeline_gap`, `timeline_overlap`, `invalid_duration`, `manifest_too_large`).
 
 ---
 

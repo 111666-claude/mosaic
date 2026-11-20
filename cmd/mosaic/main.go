@@ -22,9 +22,11 @@ func printUsage() {
 Usage:
   mosaic [options] -i <input-path-or-url> -o <output-dir>
   mosaic preview [options] [output-dir]
+  mosaic audit [options] <output-dir>
 
 Commands:
   preview                   Start local web preview player to test HLS/DASH streams
+  audit                     Verify an existing HLS/DASH package without re-encoding
 
 Options:
   -i, --input string        Input video path or remote URL (required)
@@ -56,6 +58,9 @@ Examples:
 
   # Start local web preview player to inspect generated streams:
   mosaic preview ./output/hls
+
+  # Audit an existing package without re-encoding (exit 0 = clean, 1 = issues, 2 = setup failure):
+  mosaic audit ./output/hls
 
 Documentation:
   https://farshidrezaei.github.io/mosaic/
@@ -96,6 +101,10 @@ Options:
 func main() {
 	if len(os.Args) > 1 && os.Args[1] == "preview" {
 		handlePreview(os.Args[2:])
+		return
+	}
+	if len(os.Args) > 1 && os.Args[1] == "audit" {
+		handleAudit(os.Args[2:])
 		return
 	}
 

@@ -68,6 +68,24 @@ Some tests replace `executor.DefaultExecutor` with a mock and exercise public wr
 
 Real FFmpeg and FFprobe smoke tests are best run manually because they depend on installed binaries and fixture media.
 
+### Audit Tests (`audit` package)
+
+The packaging auditor is tested entirely with on-disk fixtures built in `t.TempDir()` — no FFmpeg required for the fast suite:
+
+- `hlsFixture` / `dashFixture`: healthy dual-rendition packages that must audit with zero issues.
+- Mutation fixtures delete a segment, rewrite an EXTINF duration, inject a path-escaping or duplicate reference, break a subtitle URI/VTT, and corrupt a SegmentTimeline; each maps to an explicit issue code.
+- Limit fixtures exercise manifest size, rendition, segment, and issue caps.
+- Determinism tests assert byte-identical text/JSON output across runs and stable issue ordering.
+- `TestAuditIntegrationWithRealFFmpeg` (gated by `FFMPEG_INTEGRATION`) runs the real HLS and DASH encoders on a 720p source (a two-rung ladder), confirms the fresh packages audit clean, then verifies a deleted segment and a bad subtitle reference are reported.
+
+```bash
+# Fast, FFmpeg-free audit unit tests
+GOCACHE=/tmp/go-build go test -v ./audit/
+
+# Full real-FFmpeg integration coverage
+FFMPEG_INTEGRATION=1 GOCACHE=/tmp/go-build go test -run TestAuditIntegrationWithRealFFmpeg -v .
+```
+
 ## Smoke Test: Local File
 
 Create a short input:

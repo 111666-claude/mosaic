@@ -196,3 +196,101 @@ err := server.Start()
 ```
 
 Launches the built-in dark-mode web player with Hls.js / Dash.js, live quality switcher, and telemetry.
+
+---
+
+## Packaging Audit
+
+The `audit` package (re-exported from the root `mosaic` package) verifies an existing HLS or DASH output directory **without re-encoding or modifying any file**.
+
+### AuditPackage
+
+```go
+func AuditPackage(rootDir string, opts ...AuditOption) (*AuditReport, error)
+```
+
+- **Returns a sentinel error** when the audit cannot start: `audit.ErrDirNotFound`, `audit.ErrEmptyDirectory`, or `audit.ErrNoManifest`. Use `errors.Is` to distinguish them.
+- **Returns a Report** for every readable package; packaging defects are reported as `Issues`, not as Go errors.
+
+### Options
+
+All options have safe defaults and can be overridden:
+
+| Option | Default | Purpose |
+|--------|---------|---------|
+| `WithFormat(format)` | auto-detect | Force `"hls"` or `"dash"` |
+| `WithMaxManifestBytes(n)` | 1 MiB | Reject/oversize-flag manifests larger than `n` bytes |
+| `WithMaxRenditions(n)` | 32 | Maximum audited renditions |
+| `WithMaxSegmentsPerRendition(n)` | 10,000 | Maximum media segments per rendition |
+| `WithMaxIssues(n)` | 1,000 | Cap on collected issues |
+| `WithTimelineTolerance(s)` | 0.25s | DASH gap/overlap tolerance |
+| `WithDurationDriftTolerance(s)` | 1.0s | Cross-rendition duration drift tolerance |
+
+### Report and Issue
+
+```go
+type Report struct {
+	Format       string            // "hls" or "dash"
+	RootDir      string
+	Manifests    []string          // sorted, root-relative
+	Renditions   []RenditionReport // sorted by name
+	Issues       []Issue           // sorted by severity, manifest, rendition, time, code, path
+	ErrorCount   int
+	WarningCount int
+}
+
+func (r *Report) OK() bool         // no issues at all
+func (r *Report) HasErrors() bool  // any error-severity issue
+func (r *Report) FormatText() string
+func (r *Report) FormatJSON() ([]byte, error)
+func (r *Report) Codes() []Code    // sorted distinct issue codes
+```
+
+Each `Issue` carries a stable machine-readable `Code`, `Severity` (`error`/`warning`), the declaring `Manifest`, the `Rendition` and `Track`, an optional timeline `Time` in seconds, the offending `Path`, and a human `Message`.
+
+### Issue Codes
+
+| Code | Severity | Meaning |
+|------|----------|---------|
+| `manifest_too_large` | error | Manifest exceeds the configured byte limit |
+| `manifest_unreadable` | error | Manifest cannot be read |
+| `manifest_invalid` | error | Malformed playlist/MPD or missing required tags |
+| `path_escape` | error | Reference escapes the output directory or uses an unsupported absolute/URL form |
+| `missing_file` | error | Referenced playlist, init segment, media segment, or subtitle payload is absent |
+| `empty_file` | error | Referenced file exists but is zero bytes |
+| `missing_init_segment` | error | fMP4 rendition has no init segment declaration or file |
+| `duplicate_segment` | error | Same segment referenced/generated more than once |
+| `timeline_gap` | error | Segment numbering or DASH SegmentTimeline leaves a gap |
+| `timeline_overlap` | error | Segment numbering or timeline entry overlaps a previous interval |
+| `invalid_duration` | error | Zero/negative duration or EXTINF exceeding target duration |
+| `duration_mismatch` | warning | Rendition or MPD presentation durations drift beyond tolerance |
+| `track_declaration_invalid` | error | Malformed or unsupported track/subtitle declaration |
+| `unreferenced_segment` | warning | Media file on disk is not referenced by any manifest |
+| `rendition_limit_exceeded` | error | More renditions than the configured limit |
+| `segment_limit_exceeded` | error | More segments per rendition than the configured limit |
+| `empty_rendition` | error | Rendition declares no media |
+
+### Example
+
+```go
+import (
+	"errors"
+	"fmt"
+
+	"github.com/farshidrezaei/mosaic"
+	"github.com/farshidrezaei/mosaic/audit"
+)
+
+report, err := mosaic.AuditPackage("./output/hls",
+	mosaic.AuditWithMaxRenditions(16),
+	mosaic.AuditWithMaxSegmentsPerRendition(5000),
+)
+if errors.Is(err, audit.ErrNoManifest) {
+	// directory contains no HLS/DASH package
+} else if err != nil {
+	// ErrDirNotFound or ErrEmptyDirectory
+}
+if report.HasErrors() {
+	fmt.Print(report.FormatText())
+}
+```

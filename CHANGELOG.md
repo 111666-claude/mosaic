@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented here.
 
+## [Unreleased]
+
+### Added
+
+- Added the `audit` package for read-only verification of existing HLS and DASH CMAF output directories, usable without re-encoding. It cross-checks per rendition: master/manifest references, variant playlists, initialization segments, media segments, subtitle payloads, segment numbering, timeline gaps/overlaps, duration continuity, and track declarations.
+- Added stable, machine-readable issue codes covering missing files, empty files, path-escaping references, duplicate segments, timeline gaps and overlaps, invalid durations, cross-rendition duration drift, malformed manifests and track declarations, unreferenced media files, and exceeded safety limits.
+- Added explicit, configurable safety limits with defaults: 1 MiB per manifest, 32 renditions, 10,000 segments per rendition, and a 1,000-issue report cap; empty directories and directories without an HLS/DASH manifest return typed sentinel errors (`ErrDirNotFound`, `ErrEmptyDirectory`, `ErrNoManifest`).
+- Added deterministic, stably sorted reports with both text (`Report.FormatText`) and JSON (`Report.FormatJSON`) rendering.
+- Added the root-package `mosaic.AuditPackage` API plus `AuditWith*` functional options, and the `mosaic audit <dir>` CLI subcommand (exit codes: 0 no errors, 1 defect found, 2 setup failure) with `--json` and limit overrides.
+- Added an FFmpeg-gated integration test (`FFMPEG_INTEGRATION`) that packages a real dual-rendition HLS and DASH output, confirms both audit clean, and verifies detection of a deleted segment and a broken subtitle reference.
+
 ## [v1.8.0] - 2026-08-31
 
 ### Added
